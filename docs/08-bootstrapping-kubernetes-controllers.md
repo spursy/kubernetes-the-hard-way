@@ -28,10 +28,10 @@ Download the official Kubernetes release binaries:
 
 ```
 wget -q --show-progress --https-only --timestamping \
-  "https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kube-apiserver" \
-  "https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kube-controller-manager" \
-  "https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kube-scheduler" \
-  "https://storage.googleapis.com/kubernetes-release/release/v1.12.0/bin/linux/amd64/kubectl"
+  "https://storage.googleapis.com/kubernetes-release/release/v1.14.0/bin/linux/amd64/kube-apiserver" \
+  "https://storage.googleapis.com/kubernetes-release/release/v1.14.0/bin/linux/amd64/kube-controller-manager" \
+  "https://storage.googleapis.com/kubernetes-release/release/v1.14.0/bin/linux/amd64/kube-scheduler" \
+  "https://storage.googleapis.com/kubernetes-release/release/v1.14.0/bin/linux/amd64/kubectl"
 ```
 
 Install the Kubernetes binaries:
@@ -65,49 +65,85 @@ INTERNAL_IP=$(curl -s -H "Metadata-Flavor: Google" \
 Create the `kube-apiserver.service` systemd unit file:
 
 ```
-cat <<EOF | sudo tee /etc/systemd/system/kube-apiserver.service
+cat <<EOF | sudo tee /etc/systemd/system/kube-apiserver-2.service
 [Unit]
 Description=Kubernetes API Server
-Documentation=https://github.com/kubernetes/kubernetes
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=network.target
 
 [Service]
 ExecStart=/usr/local/bin/kube-apiserver \\
   --advertise-address=${INTERNAL_IP} \\
-  --allow-privileged=true \\
-  --apiserver-count=3 \\
-  --audit-log-maxage=30 \\
-  --audit-log-maxbackup=3 \\
-  --audit-log-maxsize=100 \\
-  --audit-log-path=/var/log/audit.log \\
-  --authorization-mode=Node,RBAC \\
-  --bind-address=0.0.0.0 \\
-  --client-ca-file=/var/lib/kubernetes/ca.pem \\
-  --enable-admission-plugins=Initializers,NamespaceLifecycle,NodeRestriction,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota \\
-  --enable-swagger-ui=true \\
+  --default-not-ready-toleration-seconds=360 \\
+  --default-unreachable-toleration-seconds=360 \\
+  --max-mutating-requests-inflight=2000 \\
+  --max-requests-inflight=4000 \\
+  --default-watch-cache-size=200 \\
+  --delete-collection-workers=2 \\
+  --encryption-provider-config=/var/lib/kubernetes/encryption-config.yaml  \\
   --etcd-cafile=/var/lib/kubernetes/ca.pem \\
   --etcd-certfile=/var/lib/kubernetes/kubernetes.pem \\
   --etcd-keyfile=/var/lib/kubernetes/kubernetes-key.pem \\
-  --etcd-servers=https://10.240.0.10:2379,https://10.240.0.11:2379,https://10.240.0.12:2379 \\
-  --event-ttl=1h \\
-  --experimental-encryption-provider-config=/var/lib/kubernetes/encryption-config.yaml \\
+  --etcd-servers=https://10.250.0.10:2379 \\
+  --bind-address=0.0.0.0 \\
+  --secure-port=6443 \\
+  --insecure-port=8080 \\
+  --tls-cert-file=/var/lib/kubernetes/kubernetes.pem \\
+  --tls-private-key-file=/var/lib/kubernetes/kubernetes-key.pem \\
+  --audit-log-maxage=15 \\
+  --audit-log-maxbackup=3 \\
+  --audit-log-maxsize=100 \\
+  --audit-log-mode=batch \\
+  --audit-log-truncate-enabled \\
+  --audit-log-batch-buffer-size=20000 \\
+  --audit-log-batch-max-size=2 \\
+  --audit-log-path=/var/log/audit.log \\
+  --profiling \\
+  --client-ca-file=/var/lib/kubernetes/ca.pem \\
+  --enable-bootstrap-token-auth \\
+  --requestheader-allowed-names="" \\
+  --requestheader-client-ca-file=/var/lib/kubernetes/ca.pem \\
+  --requestheader-extra-headers-prefix="X-Remote-Extra-" \\
+  --requestheader-group-headers=X-Remote-Group \\
+  --requestheader-username-headers=X-Remote-User \\
+  --service-account-key-file=/var/lib/kubernetes/service-account-key.pem \\
+  --authorization-mode=Node,RBAC \\
+  --anonymous-auth=false \\
+  --runtime-config=api/all=true \\
+  --enable-admission-plugins=NodeRestriction \\
+  --allow-privileged=true \\
+  --apiserver-count=2 \\
+  --event-ttl=168h \\
   --kubelet-certificate-authority=/var/lib/kubernetes/ca.pem \\
   --kubelet-client-certificate=/var/lib/kubernetes/kubernetes.pem \\
   --kubelet-client-key=/var/lib/kubernetes/kubernetes-key.pem \\
   --kubelet-https=true \\
-  --runtime-config=api/all \\
-  --service-account-key-file=/var/lib/kubernetes/service-account.pem \\
+  --kubelet-timeout=10s \\
   --service-cluster-ip-range=10.32.0.0/24 \\
   --service-node-port-range=30000-32767 \\
-  --tls-cert-file=/var/lib/kubernetes/kubernetes.pem \\
-  --tls-private-key-file=/var/lib/kubernetes/kubernetes-key.pem \\
+  --logtostderr=true \\
   --v=2
+
 Restart=on-failure
-RestartSec=5
+RestartSec=10
+Type=notify
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
 EOF
 ```
+- --advertise-address: apiserver 对外通告的ip（kubernetes服务后端节点ip）
+- --bind-address: https监听的ip地址，不能为127.0.0.1，否则外界无法访问安全端口 6443，建议使用 0.0.0.0
+- --secure-port=6443: 
+- --insecure-port=0: 关闭监听http非安全端口
+- --tls-*-file：指定 apiserver 使用的证书、私钥和 CA 文件
+- --client-ca-file=/var/lib/kubernetes/ca.pem 验证client(kube-controller-manager, kube-scheduler, kubelet, kube-proxy等)请求所带的证书
+- --runtime-config=api/all=true: 启用所有版本的 APIs
+- --enable-admission-plugins: 启动默认关闭的plugin
+- --authorization-mode=Node,RBAC、--anonymous-auth=false: 开启 Node 和 RBAC 授权模式，拒绝未授权的请求
+- --service-cluster-ip-range: 指定 Service Cluster IP 地址段
+- --service-node-port-range: 指定 NodePort 的端口范围
 
 ### Configure the Kubernetes Controller Manager
 
@@ -120,24 +156,48 @@ sudo mv kube-controller-manager.kubeconfig /var/lib/kubernetes/
 Create the `kube-controller-manager.service` systemd unit file:
 
 ```
-cat <<EOF | sudo tee /etc/systemd/system/kube-controller-manager.service
+cat << EOF | sudo tee /etc/systemd/system/kube-controller-manager.service
 [Unit]
 Description=Kubernetes Controller Manager
-Documentation=https://github.com/kubernetes/kubernetes
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
 [Service]
 ExecStart=/usr/local/bin/kube-controller-manager \\
-  --address=0.0.0.0 \\
-  --cluster-cidr=10.200.0.0/16 \\
+  --profiling \\
   --cluster-name=kubernetes \\
+  --controllers=*,bootstrapsigner,tokencleaner \\
+  --kube-api-qps=1000 \\
+  --kube-api-burst=2000 \\
+  --leader-elect \\
+  --use-service-account-credentials \\
+  --concurrent-service-syncs=2 \\
+  --bind-address=${INTERNAL_IP} \\
+  --secure-port=10252 \\
+  --tls-cert-file=/var/lib/kubernetes/kube-controller-manager.pem \\
+  --tls-private-key-file=/var/lib/kubernetes/kube-controller-manager-key.pem \\
+  --port=0 \\
+  --authentication-kubeconfig=/var/lib/kubernetes/kube-controller-manager.kubeconfig \\
+  --client-ca-file=/var/lib/kubernetes/ca.pem \\
+  --requestheader-allowed-names="" \\
+  --requestheader-client-ca-file=/var/lib/kubernetes/ca.pem \\
+  --requestheader-extra-headers-prefix="X-Remote-Extra-" \\
+  --requestheader-group-headers=X-Remote-Group \\
+  --requestheader-username-headers=X-Remote-User \\
+  --authorization-kubeconfig=/var/lib/kubernetes/kube-controller-manager.kubeconfig \\
   --cluster-signing-cert-file=/var/lib/kubernetes/ca.pem \\
   --cluster-signing-key-file=/var/lib/kubernetes/ca-key.pem \\
-  --kubeconfig=/var/lib/kubernetes/kube-controller-manager.kubeconfig \\
-  --leader-elect=true \\
+  --experimental-cluster-signing-duration=8760h \\
+  --horizontal-pod-autoscaler-sync-period=10s \\
+  --concurrent-deployment-syncs=10 \\
+  --concurrent-gc-syncs=30 \\
+  --node-cidr-mask-size=24 \\
+  --service-cluster-ip-range=10.32.0.0/24 \\
+  --pod-eviction-timeout=6m \\
+  --terminated-pod-gc-threshold=10000 \\
   --root-ca-file=/var/lib/kubernetes/ca.pem \\
   --service-account-private-key-file=/var/lib/kubernetes/service-account-key.pem \\
-  --service-cluster-ip-range=10.32.0.0/24 \\
-  --use-service-account-credentials=true \\
+  --kubeconfig=/var/lib/kubernetes/kube-controller-manager.kubeconfig \\
+  --logtostderr=true \\
   --v=2
 Restart=on-failure
 RestartSec=5
@@ -146,6 +206,14 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 ```
+- --port=0：关闭监听非安全端口（http）
+- --kubeconfig：指定 kubeconfig 文件路径，kube-controller-manager 使用它连接和验证 kube-apiserver
+- --authentication-kubeconfig 和 --authorization-kubeconfig：kube-controller-manager 使用它连接 apiserver，对 client 的请求进行认证和授权
+- --cluster-signing-*-file：签名 TLS Bootstrap 创建的证书
+- --experimental-cluster-signing-duration：指定 TLS Bootstrap 证书的有效期
+- --service-account-private-key-file：签名 ServiceAccount 中 Token 的私钥文件，必须和 kube-apiserver 的 --service-account-key-file 指定的公钥文件配对使用
+- --leader-elect=true：集群运行模式，启用选举功能；被选为 leader 的节点负责处理工作，其它节点为阻塞状态
+- --use-service-account-credentials=true: kube-controller-manager 中各 controller 使用 serviceaccount 访问 kube-apiserver
 
 ### Configure the Kubernetes Scheduler
 
@@ -171,17 +239,34 @@ EOF
 Create the `kube-scheduler.service` systemd unit file:
 
 ```
-cat <<EOF | sudo tee /etc/systemd/system/kube-scheduler.service
+cat << EOF | sudo tee /etc/systemd/system/kube-scheduler.service
 [Unit]
 Description=Kubernetes Scheduler
-Documentation=https://github.com/kubernetes/kubernetes
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
 [Service]
 ExecStart=/usr/local/bin/kube-scheduler \\
-  --config=/etc/kubernetes/config/kube-scheduler.yaml \\
+  --config=/etc/kubernetes/kube-scheduler.yaml \\
+  --bind-address=${INTERNAL_IP} \\
+  --cluster-cidr=10.210.0.0/16 \\
+  --secure-port=10259 \\
+  --port=0 \\
+  --tls-cert-file=/var/lib/kubernetes/kube-scheduler.pem \\
+  --tls-private-key-file=/var/lib/kubernetes/kube-scheduler-key.pem \\
+  --authentication-kubeconfig=/var/lib/kubernetes/kube-scheduler.kubeconfig \\
+  --client-ca-file=/var/lib/kubernetes/ca.pem \\
+  --requestheader-allowed-names="" \\
+  --requestheader-client-ca-file=/var/lib/kubernetes/ca.pem \\
+  --requestheader-extra-headers-prefix="X-Remote-Extra-" \\
+  --requestheader-group-headers=X-Remote-Group \\
+  --requestheader-username-headers=X-Remote-User \\
+  --leader-elect=true \\
+  --authorization-kubeconfig=/var/lib/kubernetes/kube-scheduler.kubeconfig \\
+  --logtostderr=true \\
   --v=2
-Restart=on-failure
+Restart=always
 RestartSec=5
+StartLimitInterval=0
 
 [Install]
 WantedBy=multi-user.target
@@ -314,6 +399,8 @@ EOF
 ```
 
 The Kubernetes API Server authenticates to the Kubelet as the `kubernetes` user using the client certificate as defined by the `--kubelet-client-certificate` flag.
+
+// 在执行 kubectl exec、run、logs 等命令时，apiserver 会将请求转发到 kubelet 的 https 端口。这里定义 RBAC 规则，授权 apiserver 使用的证书（kubernetes.pem）用户名（CN：kuberntes）访问 kubelet API 的权限
 
 Bind the `system:kube-apiserver-to-kubelet` ClusterRole to the `kubernetes` user:
 
