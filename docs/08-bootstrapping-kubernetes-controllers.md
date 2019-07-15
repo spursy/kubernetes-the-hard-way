@@ -65,7 +65,7 @@ INTERNAL_IP=$(curl -s -H "Metadata-Flavor: Google" \
 Create the `kube-apiserver.service` systemd unit file:
 
 ```
-cat <<EOF | sudo tee /etc/systemd/system/kube-apiserver-2.service
+cat <<EOF | sudo tee /etc/systemd/system/kube-apiserver.service
 [Unit]
 Description=Kubernetes API Server
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
@@ -84,7 +84,7 @@ ExecStart=/usr/local/bin/kube-apiserver \\
   --etcd-cafile=/var/lib/kubernetes/ca.pem \\
   --etcd-certfile=/var/lib/kubernetes/kubernetes.pem \\
   --etcd-keyfile=/var/lib/kubernetes/kubernetes-key.pem \\
-  --etcd-servers=https://10.250.0.10:2379 \\
+  --etcd-servers=https://10.240.0.10:2379,https://10.240.0.11:2379 \\
   --bind-address=0.0.0.0 \\
   --secure-port=6443 \\
   --insecure-port=8080 \\
