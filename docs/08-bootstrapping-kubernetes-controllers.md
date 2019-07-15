@@ -151,6 +151,7 @@ Move the `kube-controller-manager` kubeconfig into place:
 
 ```
 sudo mv kube-controller-manager.kubeconfig /var/lib/kubernetes/
+sudo mv kube-controller-manager.pem kube-controller-manager-key.pem /var/lib/kubernetes/
 ```
 
 Create the `kube-controller-manager.service` systemd unit file:
