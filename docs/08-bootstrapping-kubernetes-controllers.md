@@ -221,7 +221,7 @@ Move the `kube-scheduler` kubeconfig into place:
 
 ```
 sudo mv kube-scheduler.kubeconfig /var/lib/kubernetes/
-sudo mv  kube-scheduler.pem kubernetes-scheduler-key.pem /var/lib/kubernetes/
+sudo mv  kube-scheduler.pem kube-scheduler-key.pem /var/lib/kubernetes/
 ```
 
 Create the `kube-scheduler.yaml` configuration file:
