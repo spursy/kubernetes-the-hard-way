@@ -65,7 +65,7 @@ INTERNAL_IP=$(curl -s -H "Metadata-Flavor: Google" \
 Create the `kube-apiserver.service` systemd unit file:
 
 ```
-cat <<EOF | sudo tee /etc/systemd/system/kube-apiserver-2.service
+cat <<EOF | sudo tee /etc/systemd/system/kube-apiserver.service
 [Unit]
 Description=Kubernetes API Server
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
