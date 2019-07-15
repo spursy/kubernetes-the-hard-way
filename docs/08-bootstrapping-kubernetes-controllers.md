@@ -221,13 +221,18 @@ Move the `kube-scheduler` kubeconfig into place:
 
 ```
 sudo mv kube-scheduler.kubeconfig /var/lib/kubernetes/
+sudo mv  kube-scheduler.pem kubernetes-scheduler-key.pem /var/lib/kubernetes/
 ```
 
 Create the `kube-scheduler.yaml` configuration file:
 
 ```
+sudo mkdir /etc/kubernetes && mkdir /etc/kubernetes/config
+```
+
+```
 cat <<EOF | sudo tee /etc/kubernetes/config/kube-scheduler.yaml
-apiVersion: componentconfig/v1alpha1
+apiVersion: kubescheduler.config.k8s.io/v1alpha1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "/var/lib/kubernetes/kube-scheduler.kubeconfig"
@@ -246,9 +251,8 @@ Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
 [Service]
 ExecStart=/usr/local/bin/kube-scheduler \\
-  --config=/etc/kubernetes/kube-scheduler.yaml \\
+  --config=/etc/kubernetes/config/kube-scheduler.yaml \\
   --bind-address=${INTERNAL_IP} \\
-  --cluster-cidr=10.210.0.0/16 \\
   --secure-port=10259 \\
   --port=0 \\
   --tls-cert-file=/var/lib/kubernetes/kube-scheduler.pem \\
@@ -261,7 +265,6 @@ ExecStart=/usr/local/bin/kube-scheduler \\
   --requestheader-group-headers=X-Remote-Group \\
   --requestheader-username-headers=X-Remote-User \\
   --leader-elect=true \\
-  --authorization-kubeconfig=/var/lib/kubernetes/kube-scheduler.kubeconfig \\
   --logtostderr=true \\
   --v=2
 Restart=always
