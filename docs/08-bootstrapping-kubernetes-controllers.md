@@ -173,10 +173,10 @@ ExecStart=/usr/local/bin/kube-controller-manager \\
   --use-service-account-credentials \\
   --concurrent-service-syncs=2 \\
   --bind-address=${INTERNAL_IP} \\
-  --secure-port=10252 \\
+  --secure-port=10253 \\
   --tls-cert-file=/var/lib/kubernetes/kube-controller-manager.pem \\
   --tls-private-key-file=/var/lib/kubernetes/kube-controller-manager-key.pem \\
-  --port=0 \\
+  --port=10252 \\
   --authentication-kubeconfig=/var/lib/kubernetes/kube-controller-manager.kubeconfig \\
   --client-ca-file=/var/lib/kubernetes/ca.pem \\
   --requestheader-allowed-names="" \\
